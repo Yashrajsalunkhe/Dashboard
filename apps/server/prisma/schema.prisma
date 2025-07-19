@@ -1,15 +1,204 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ========= ENUMS =========
+enum Role {
+  ADMIN
+  STAFF
+  DENTIST
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum AppointmentType {
+  CONSULTATION
+  SURGERY
+  FOLLOW_UP
+  CLEANING
+  XRAY
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  CARD
+  RAZORPAY
+}
+
+enum PaymentStatus {
+  PAID
+  PENDING
+  FAILED
+}
+
+
+// ========= NEXTAUTH.JS MODELS (DO NOT EDIT) =========
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+
+//  ========= APPLICATION MODELS =========
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String
+  image         String?
+  role          Role      @default(STAFF)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  sessions    Session[]
+  accounts    Account[]
+  doctor      Doctor?      // A user with role DENTIST will have one Doctor profile
+  
+  // Audit trails
+  createdPatients   Patient[]
+  createdBills      Bill[]
+  createdAppointments Appointment[]
+}
+
+model Doctor {
+  id              String   @id @default(cuid())
+  phone           String?
+  availableDays   String[] // e.g., ["MONDAY", "WEDNESDAY"]
+  availableTime   String?  // e.g., "10:00-18:00"
+  experienceYears Int?
+  education       String?
+  createdAt       DateTime @default(now())
+
+  // One-to-one relation with a User
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // A doctor has many appointments and bills
+  appointments Appointment[]
+  bills        Bill[]
+}
+
+model Patient {
+  id             String   @id @default(cuid())
+  name           String
+  age            Int
+  gender         String
+  contact        String
+  address        String?
+  medicalHistory String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Who created this patient record
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdById String
+
+  // A patient can have many appointments and bills
+  appointments Appointment[]
+  bills        Bill[]
+}
+
+model Appointment {
+  id              String            @id @default(cuid())
+  date            DateTime
+  time            String
+  status          AppointmentStatus @default(SCHEDULED)
+  appointmentType AppointmentType
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relations
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId String
+
+  doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  doctorId String
+  
+  // Who booked this appointment
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdById String
+  
+  reminders Reminder[]
+  bill      Bill?
+}
+
+model Bill {
+  id                String        @id @default(cuid())
+  amount            Float
+  method            PaymentMethod @default(RAZORPAY)
+  status            PaymentStatus @default(PENDING)
+  razorpayPaymentId String?       @unique
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  // Relations
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId String
+
+  doctor   Doctor @relation(fields: [doctorId], references: [id])
+  doctorId String
+  
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+  appointmentId String?      @unique
+
+  // Who created this bill
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdById String
+}
+
+model Reminder {
+  id        String   @id @default(cuid())
+  type      String // "EMAIL" or "WHATSAPP"
+  status    String   @default("PENDING") // PENDING, SENT, FAILED
+  sentAt    DateTime?
+  createdAt DateTime @default(now())
+
+  // Relation to the appointment
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  appointmentId String
 }

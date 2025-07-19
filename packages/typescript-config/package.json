@@ -8,8 +8,11 @@
   },
   "files": [
     "base.json",
-    "nextjs.json", 
+    "nextjs.json",
     "react-library.json",
     "vite.json"
-  ]
+  ],
+  "dependencies": {
+    "@supabase/supabase-js": "^2.52.0"
+  }
 }
