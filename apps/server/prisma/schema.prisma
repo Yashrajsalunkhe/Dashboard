@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -43,65 +43,22 @@ enum PaymentStatus {
   FAILED
 }
 
-
-// ========= NEXTAUTH.JS MODELS (DO NOT EDIT) =========
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
-
 //  ========= APPLICATION MODELS =========
 
 model User {
-  id            String    @id @default(cuid())
+  id            String    @id // This ID will come from Supabase Auth
   name          String?
   email         String    @unique
   emailVerified DateTime?
-  password      String
   image         String?
   role          Role      @default(STAFF)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  sessions    Session[]
-  accounts    Account[]
-  doctor      Doctor?      // A user with role DENTIST will have one Doctor profile
-  
-  // Audit trails
-  createdPatients   Patient[]
-  createdBills      Bill[]
+  doctor          Doctor?       // A user with role DENTIST will have one Doctor profile
+  createdPatients Patient[]
+  createdBills    Bill[]
   createdAppointments Appointment[]
 }
 
@@ -158,11 +115,11 @@ model Appointment {
 
   doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   doctorId String
-  
+
   // Who booked this appointment
   createdBy   User   @relation(fields: [createdById], references: [id])
   createdById String
-  
+
   reminders Reminder[]
   bill      Bill?
 }
@@ -175,14 +132,14 @@ model Bill {
   razorpayPaymentId String?       @unique
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
-  
+
   // Relations
   patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
   patientId String
 
   doctor   Doctor @relation(fields: [doctorId], references: [id])
   doctorId String
-  
+
   appointment   Appointment? @relation(fields: [appointmentId], references: [id])
   appointmentId String?      @unique
 
@@ -192,11 +149,11 @@ model Bill {
 }
 
 model Reminder {
-  id        String   @id @default(cuid())
-  type      String // "EMAIL" or "WHATSAPP"
-  status    String   @default("PENDING") // PENDING, SENT, FAILED
-  sentAt    DateTime?
-  createdAt DateTime @default(now())
+  id            String      @id @default(cuid())
+  type          String // "EMAIL" or "WHATSAPP"
+  status        String      @default("PENDING") // PENDING, SENT, FAILED
+  sentAt        DateTime?
+  createdAt     DateTime    @default(now())
 
   // Relation to the appointment
   appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
